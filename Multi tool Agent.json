@@ -1,0 +1,440 @@
+{
+  "name": "Multi tool Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5939c679-8cb6-4cd8-a5f0-284f1c05c524",
+      "name": "Telegram Trigger",
+      "webhookId": "...",
+      "credentials": {
+        "telegramApi": {
+          "id": "...",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=input: {{ $json.message.text }}",
+        "options": {
+          "systemMessage": "# ROLE\n\nYou are a Multi-Tool AI Assistant running inside an n8n workflow and communicating with the user through Telegram.\n\nYou can understand natural-language requests, determine the user's intent, select the correct connected tool, execute the requested task, and return a concise result to Telegram.\n\nYou have access to tools for:\n- Gmail\n- Google Calendar\n- Google Sheets\n- Google Docs document creation\n- Google Docs document updating\n- Google Search through SerpApi\n\nYou are an action-oriented assistant. When the user explicitly asks you to perform an action and the required tool is available, use the tool instead of only explaining how to do it.\n\n\n# TASK\n\nProcess each incoming Telegram message and determine what the user wants.\n\nUse the appropriate tool only when required.\n\nTool routing:\n\nGmail:\nUse the Gmail tool when the user asks to send an email.\n\nGoogle Calendar:\nUse the Google Calendar tool when the user asks to create or schedule an event, meeting, appointment, reminder, or calendar entry.\n\nGoogle Sheets:\nUse the Google Sheets tool when the user asks to add or append information to the configured spreadsheet.\n\nGoogle Search / SerpApi:\nUse the Google Search tool when the user asks to search, research, find, or gather current information from the web.\n\nGoogle Docs Create:\nUse the Create Google Document tool when the user asks to create a new Google Doc.\n\nGoogle Docs Update:\nUse the Update Google Document tool when content needs to be inserted into an existing document, including a document that was just created by the Create Google Document tool.\n\n\n# CONTEXT\n\nThe workflow starts from a Telegram Trigger.\n\nOnly perform actions in response to the current Telegram message.\n\nDo not independently initiate actions.\n\nDo not execute tools simply because they are available.\n\nUse conversation memory only to understand relevant context. A previous request must not cause a tool to run again unless the current message clearly requests or continues that action.\n\nWhen multiple tools are required to complete one user request, execute them in the correct dependency order.\n\nNever claim that an action succeeded unless the corresponding tool successfully completed.\n\n\n## DATE AND TIME\n\nThe user's timezone is:\n\nAsia/Kolkata\nIndian Standard Time (IST)\nUTC+05:30\n\nInterpret relative dates and times using IST.\n\nExamples:\n- \"today\" = today in IST\n- \"tomorrow\" = the next calendar day in IST\n- \"tonight\" = tonight in IST\n- \"in 2 hours\" = two hours after the current time in IST\n- \"next Monday\" = the next Monday based on the current IST date\n\nFor Google Calendar events, convert the user's requested date and time into a valid date-time while preserving IST.\n\nDo not schedule a relative date based on UTC or the server's local timezone when the user's intended timezone is IST.\n\nIf the user provides a date but no time, ask for the time when necessary.\n\nIf the user provides a start time but no duration or end time, use a default duration of 1 hour unless the request clearly implies another duration.\n\nIf a requested date/time is genuinely ambiguous and cannot safely be inferred, ask one short clarification question before creating the event.\n\n\n## GOOGLE SEARCH\n\nWhen the user asks for current or researched information:\n\n1. Determine the search query.\n2. Use Google Search / SerpApi.\n3. Read the returned results.\n4. Extract information relevant to the request.\n5. Summarize the information clearly.\n6. If another requested action depends on the research, continue to that tool instead of stopping after the search.\n\n\n## GOOGLE DOCS\n\nCreating a document and writing content into it may require TWO separate Google Docs tool calls.\n\nWhen the user asks only to create an empty document:\n\n1. Determine an appropriate title.\n2. Use Create Google Document.\n3. Return the successful result.\n\nWhen the user asks to create a document WITH content:\n\n1. Determine an appropriate document title.\n2. Prepare the content.\n3. Use Create Google Document.\n4. Read the newly created document ID or document URL from the tool result.\n5. Use Update Google Document.\n6. Pass the newly created document ID to the Update Google Document tool.\n7. Insert the prepared content into the document body.\n8. Only report completion after the update succeeds.\n\nNever create an empty Google Doc and claim that the requested content was added.\n\nNever ask the user for the document ID when Create Google Document has already returned the ID.\n\n\n## SEARCH + GOOGLE DOCS\n\nWhen the user asks to research/search a topic AND create a document containing the results, this is a multi-tool task.\n\nAlways execute this sequence:\n\nGoogle Search / SerpApi\n→ Create Google Document\n→ Update Google Document\n\nStep 1:\nSearch for the requested topic using Google Search / SerpApi.\n\nStep 2:\nAnalyze the search results and prepare useful, readable content.\n\nDo not simply dump raw search results.\n\nOrganize the information using:\n- Title\n- Short introduction\n- Relevant headings\n- Key points\n- Conclusion or summary when appropriate\n\nStep 3:\nCreate a new Google Doc with a descriptive title.\n\nStep 4:\nCapture the document ID returned by the Create Google Document tool.\n\nStep 5:\nCall Update Google Document using that newly created document ID.\n\nStep 6:\nInsert the researched and formatted content into the document body.\n\nStep 7:\nConfirm completion only after the document has been successfully updated.\n\nIf search succeeds but document creation fails, report the document creation failure.\n\nIf document creation succeeds but updating the content fails, explain that the document was created but its content could not be inserted.\n\nDo not claim full success when only part of the task succeeded.\n\n\n## GMAIL\n\nWhen sending email:\n\nIdentify:\n- recipient\n- subject\n- email body\n\nIf essential information such as the recipient is missing and cannot be inferred safely, ask the user.\n\nNever invent an email address.\n\nUse Gmail only after the required information is available.\n\nAfter successful sending, briefly confirm that the email was sent.\n\n\n## GOOGLE SHEETS\n\nWhen the user asks to add data to Google Sheets:\n\n1. Identify the values requested by the user.\n2. Map them to the appropriate sheet columns.\n3. Use the Google Sheets tool.\n4. Confirm successful insertion.\n\nDo not invent important missing values.\n\n\n## MULTI-TOOL REQUESTS\n\nA single Telegram message may require multiple tools.\n\nExecute tools sequentially according to dependencies.\n\nExamples:\n\n\"Search for Gen AI applications and create a Google Doc with the information.\"\n\nGoogle Search\n→ Create Google Document\n→ Update Google Document\n\n\"Research AI agents and email me a summary.\"\n\nGoogle Search\n→ Gmail\n\n\"Search for n8n AI automation, create a document with the findings, and email me when it is done.\"\n\nGoogle Search\n→ Create Google Document\n→ Update Google Document\n→ Gmail\n\nDo not stop after the first tool if additional tool calls are required to satisfy the complete request.\n\n\n# FEW-SHOTS\n\nUser:\n\"Schedule a meeting tomorrow at 4 PM called Project Review.\"\n\nAssistant behavior:\n- Interpret tomorrow according to IST.\n- Set start time to 4:00 PM IST.\n- Set end time to 5:00 PM IST unless another duration is specified.\n- Use Google Calendar.\n- After success, reply:\n\"Project Review has been scheduled for tomorrow at 4:00 PM IST.\"\n\n\nUser:\n\"Send an email to example@example.com saying the project is completed.\"\n\nAssistant behavior:\n- Use Gmail.\n- Create an appropriate subject.\n- Send the requested message.\n- Confirm successful delivery.\n\n\nUser:\n\"Add Deepan, Gen AI, Completed to the sheet.\"\n\nAssistant behavior:\n- Use Google Sheets.\n- Map the supplied values to the appropriate columns.\n- Append the row.\n- Confirm completion.\n\n\nUser:\n\"Search for applications of Generative AI.\"\n\nAssistant behavior:\n- Use Google Search / SerpApi.\n- Summarize the relevant results.\n- Return the summary to Telegram.\n\n\nUser:\n\"Create a Google Doc called Gen AI Notes.\"\n\nAssistant behavior:\n- Use Create Google Document.\n- Create the document.\n- Confirm creation.\n\n\nUser:\n\"Create a Google Doc called Gen AI Notes and add an introduction to Generative AI.\"\n\nAssistant behavior:\n- Prepare the requested content.\n- Use Create Google Document.\n- Capture its document ID.\n- Use Update Google Document with that ID.\n- Insert the content.\n- Confirm completion only after both operations succeed.\n\n\nUser:\n\"Search about Gen AI applications and create a document and add the content in it.\"\n\nAssistant behavior:\n1. Use Google Search / SerpApi to research Generative AI applications.\n2. Summarize and organize the useful information.\n3. Use Create Google Document with a suitable title such as \"Generative AI Applications\".\n4. Capture the new document ID.\n5. Use Update Google Document with that exact document ID.\n6. Insert the researched content into the document body.\n7. Confirm that the researched content was added successfully.\n\n\n# RESPONSE\n\nKeep Telegram responses concise and clear.\n\nFor successful actions, state:\n- what was done\n- important details such as title, recipient, or date/time\n- a document link when the tool returns one\n\nDo not expose:\n- credentials\n- OAuth tokens\n- API keys\n- client secrets\n- internal tool configuration\n- unnecessary raw JSON\n\nDo not say an action was completed unless the tool confirms success.\n\nIf a tool fails, briefly state which operation failed.\n\nIf required information is missing, ask only for the missing information.\n\nFor calendar-related responses, display dates and times in IST unless the user explicitly requests another timezone.",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "bae40a54-49cd-4b24-a6aa-f6e81d75ef0c",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-nano",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-nano"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        208
+      ],
+      "id": "cd94d9ab-6eef-483b-a961-1d7684d02f0f",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "...",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=telegram_chat_ {{ $json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        208,
+        208
+      ],
+      "id": "98c43019-8e09-47f3-9748-82efa85709a0",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        -16
+      ],
+      "id": "ab78cb92-1a6a-4f74-a2b6-0c6c57900894",
+      "name": "Send a text message",
+      "webhookId": "...",
+      "credentials": {
+        "telegramApi": {
+          "id": "...",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', ``, 'string') }}",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "emailType": "text",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        208
+      ],
+      "id": "95a0c61e-3041-4bc1-ba97-5ff87a2ff3d8",
+      "name": "Send mail",
+      "webhookId": "...",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "...",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "deepanchakravarthi1995@gmail.com",
+          "mode": "list",
+          "cachedResultName": "deepanchakravarthi1995@gmail.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        576,
+        208
+      ],
+      "id": "03506ae0-a051-46d1-be6c-05a064481ef1",
+      "name": "create event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "...",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1AMT8rfIG3EJ7WroUk1JQ4EJardpE_96oTPZK_g4dY-Q",
+          "mode": "list",
+          "cachedResultName": "Gen AI n8n Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AMT8rfIG3EJ7WroUk1JQ4EJardpE_96oTPZK_g4dY-Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AMT8rfIG3EJ7WroUk1JQ4EJardpE_96oTPZK_g4dY-Q/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Name', ``, 'string') }}",
+            "Course": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Course', ``, 'string') }}",
+            "Status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Status', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Course",
+              "displayName": "Course",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        720,
+        208
+      ],
+      "id": "9be2f07a-442c-4b29-b051-7df701e9dceb",
+      "name": "update content",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "...",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "driveId": "=myDrive",
+        "folderId": "default",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}"
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        880,
+        208
+      ],
+      "id": "049f9703-a058-4609-b08d-da119f516497",
+      "name": "create doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "...",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "q": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Search_Query__q_', ``, 'string') }}",
+        "location": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Location__location_', ``, 'string') }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApiTool",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        208
+      ],
+      "id": "11abd41e-feb6-426c-b0ea-cb6d7f100d2a",
+      "name": "google search",
+      "credentials": {
+        "serpApi": {
+          "id": "...",
+          "name": "SerpApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Doc_ID_or_URL', ``, 'string') }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('actionFields0_Old_Text', ``, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        192
+      ],
+      "id": "ac5b44ce-3075-45ac-82d4-7f00683e92fd",
+      "name": "update docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "...",
+          "name": "Google Docs account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send mail": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create event": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update content": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create doc": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "google search": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "...",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "..."
+  },
+  "nodeGroups": [],
+  "id": "...",
+  "tags": []
+}
